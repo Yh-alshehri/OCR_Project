@@ -1,0 +1,8 @@
+flask
+flask-cors
+PyMuPDF
+easyocr
+Pillow
+numpy
+opencv-python-headless
+gunicorn

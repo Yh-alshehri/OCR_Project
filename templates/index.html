@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OCR - استخراج النصوص</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        body {
+            background: linear-gradient(135deg, #0b0f19, #1a2234);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            width: 100%;
+            max-width: 950px;
+            background: #1a2234;
+            padding: 30px;
+            border-radius: 16px;
+            border: 1px solid #28334e;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }
+        h1 {
+            text-align: center;
+            font-size: 28px;
+            margin-bottom: 8px;
+            background: linear-gradient(90deg, #ffffff, #a5b4fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .subtitle {
+            text-align: center;
+            color: #9ca3af;
+            margin-bottom: 25px;
+            font-size: 14px;
+        }
+        .upload-area {
+            border: 2px dashed #374151;
+            border-radius: 12px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: 0.3s;
+            background: #131927;
+        }
+        .upload-area:hover {
+            border-color: #6366f1;
+        }
+        .upload-area.dragover {
+            border-color: #6366f1;
+            background: #1f2a3f;
+        }
+        .upload-icon {
+            font-size: 40px;
+        }
+        .file-name {
+            color: #a5b4fc;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        .row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .col {
+            flex: 1;
+            min-width: 180px;
+        }
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            color: #d1d5db;
+            font-size: 14px;
+        }
+        select, button {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        select {
+            background: #242e42;
+            color: #fff;
+        }
+        button {
+            background: #6366f1;
+            color: #fff;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+        button:hover {
+            background: #4f46e5;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .output {
+            margin-top: 20px;
+            background: #0b0f19;
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid #28334e;
+            min-height: 150px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #e5e7eb;
+        }
+        .output:empty::before {
+            content: "📝 النص المستخرج سيظهر هنا...";
+            color: #6b7280;
+        }
+        .status {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #9ca3af;
+        }
+        .loading {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border: 2px solid #6366f1;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .btn-download {
+            background: #22c55e;
+            margin-top: 10px;
+        }
+        .btn-download:hover {
+            background: #16a34a;
+        }
+        .flex {
+            display: flex;
+            gap: 10px;
+        }
+
+        /* ===== ملاحظات الدقة ===== */
+        .accuracy-note {
+            margin-top: 25px;
+            padding: 16px 20px;
+            background: #0f172a;
+            border-radius: 12px;
+            border: 1px solid #28334e;
+        }
+        .accuracy-note h3 {
+            margin-bottom: 10px;
+            font-size: 16px;
+            color: #e5e7eb;
+        }
+        .accuracy-note table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        .accuracy-note th {
+            text-align: left;
+            color: #9ca3af;
+            font-weight: 600;
+            padding-bottom: 6px;
+            border-bottom: 1px solid #28334e;
+        }
+        .accuracy-note td {
+            padding: 6px 0;
+            color: #d1d5db;
+        }
+        .accuracy-note .note-small {
+            margin-top: 10px;
+            font-size: 13px;
+            color: #9ca3af;
+        }
+
+        .footer {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #6b7280;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📖 OCR استخراج النصوص</h1>
+        <p class="subtitle">ارفع صورة أو ملف PDF واختر اللغة</p>
+
+        <!-- رفع الملف -->
+        <div class="upload-area" id="dropZone">
+            <div class="upload-icon">📤</div>
+            <p>اسحب الملف هنا أو اضغط للرفع</p>
+            <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg" style="display:none;">
+            <div class="file-name" id="fileName"></div>
+        </div>
+
+        <!-- اختيار اللغة واستخراج -->
+        <div class="row">
+            <div class="col">
+                <label for="langSelect">🌐 اللغة</label>
+                <select id="langSelect">
+                    <option value="ar">العربية</option>
+                    <option value="en">English</option>
+                </select>
+            </div>
+            <div class="col">
+                <label>&nbsp;</label>
+                <button id="extractBtn">🚀 استخراج النص</button>
+            </div>
+        </div>
+
+        <!-- النتيجة -->
+        <div class="output" id="output"></div>
+        <div class="status" id="status"></div>
+
+        <!-- تحميل -->
+        <div class="flex" style="margin-top: 10px;">
+            <button class="btn-download" id="downloadBtn" style="display:none;">📥 تحميل النص</button>
+        </div>
+
+        <!-- ===== ملاحظات الدقة ===== -->
+        <div class="accuracy-note">
+            <h3> دقة استخراج النصوص</h3>
+            <table>
+                <tr>
+                    <th>اللغة</th>
+                    <th>الدقة المتوقعة</th>
+                    <th>ملاحظات</th>
+                </tr>
+                <tr>
+                    <td> العربية</td>
+                    <td>~85–95%</td>
+                    <td>تعتمد على جودة الصورة ووضوح الخط</td>
+                </tr>
+                <tr>
+                    <td> English</td>
+                    <td>~90–98%</td>
+                    <td>أدق مع النصوص الواضحة والخطوط المنتظمة</td>
+                </tr>
+            </table>
+            <p class="note-small"> قد تقل الدقة مع الصور منخفضة الجودة أو الخطوط غير الواضحة</p>
+        </div>
+
+        <div class="footer">
+        يستخرج أول 5 صفحات | دقة عالية
+        </div>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const fileName = document.getElementById('fileName');
+        const extractBtn = document.getElementById('extractBtn');
+        const output = document.getElementById('output');
+        const status = document.getElementById('status');
+        const langSelect = document.getElementById('langSelect');
+        const downloadBtn = document.getElementById('downloadBtn');
+
+        let selectedFile = null;
+
+        // الضغط للرفع
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        // السحب والإفلات
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) {
+                fileInput.files = e.dataTransfer.files;
+                handleFileSelect(e.dataTransfer.files[0]);
+            }
+        });
+
+        // اختيار ملف
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length) handleFileSelect(fileInput.files[0]);
+        });
+
+        function handleFileSelect(file) {
+            selectedFile = file;
+            fileName.textContent = '📎 ' + file.name;
+            output.textContent = '';
+            status.textContent = '';
+            downloadBtn.style.display = 'none';
+        }
+
+        // استخراج النص
+        extractBtn.addEventListener('click', async () => {
+            if (!selectedFile) {
+                status.textContent = '⚠️ الرجاء اختيار ملف أولاً';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            formData.append('language', langSelect.value);
+
+            output.textContent = '';
+            status.innerHTML = '<span class="loading"></span> جاري الاستخراج...';
+            extractBtn.disabled = true;
+            downloadBtn.style.display = 'none';
+
+            try {
+                const res = await fetch('/extract', { method: 'POST', body: formData });
+                const data = await res.json();
+
+                if (data.error) {
+                    output.textContent = '❌ ' + data.error;
+                    status.textContent = '❌ حدث خطأ';
+                } else {
+                    output.textContent = data.text || '⚠️ لم يتم استخراج نص';
+                    status.textContent = '✅ تم الاستخراج بنجاح';
+                    if (data.text && data.text.length > 10) {
+                        downloadBtn.style.display = 'inline-block';
+                        downloadBtn.onclick = () => {
+                            const blob = new Blob([data.text], { type: 'text/plain' });
+                            const a = document.createElement('a');
+                            a.href = URL.createObjectURL(blob);
+                            a.download = 'extracted_text.txt';
+                            a.click();
+                        };
+                    }
+                }
+            } catch (err) {
+                output.textContent = '❌ خطأ في الاتصال بالسيرفر';
+                status.textContent = '❌ ' + err.message;
+            }
+
+            extractBtn.disabled = false;
+        });
+    </script>
+</body>
+</html>
