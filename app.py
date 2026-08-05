@@ -1,7 +1,5 @@
 from flask import Flask, render_template, request, jsonify
 from flask_cors import CORS
-import webbrowser
-from threading import Timer
 import io
 import os
 import fitz
@@ -15,6 +13,15 @@ app = Flask(__name__)
 CORS(app)
 
 # ============================================
+# تحميل نماذج EasyOCR مرة واحدة فقط عند تشغيل السيرفر
+# (لتوفير الذاكرة ومنع تعطل السيرفر)
+# ============================================
+print("Loading OCR Models...")
+reader_ar_en = easyocr.Reader(['ar', 'en'], gpu=False)
+reader_en = easyocr.Reader(['en'], gpu=False)
+print("OCR Models Loaded Successfully!")
+
+# ============================================
 # تحسين الصورة المخصص للغة العربية
 # ============================================
 def preprocess_image_arabic(img_np):
@@ -24,10 +31,10 @@ def preprocess_image_arabic(img_np):
         else:
             gray = img_np
         
-        # استخدام Denoising لإزالة الضوضاء دون تشويه منحنيات الحروف العربية
+        # إزالة الضوضاء دون تشويه منحنيات الحروف العربية
         denoised = cv2.fastNlMeansDenoising(gray, h=10)
         
-        # تطبيق Binarization متكيف لحفظ اتصال الحروف العربية
+        # تطبيق Binarization متكيف لحفظ اتصال الحروف
         binary = cv2.adaptiveThreshold(
             denoised, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
             cv2.THRESH_BINARY, 11, 2
@@ -45,30 +52,24 @@ def extract_from_pdf(file_bytes, language):
         all_text = ""
         pages_done = 0
 
-        # تحميل القارئ (مع إضافة 'en' مع 'ar' لتفادي تشويه الأرقام والكلمات المدمجة)
-        if language == "ar":
-            reader = easyocr.Reader(['ar', 'en'], gpu=False)
-        else:
-            reader = easyocr.Reader(['en'], gpu=False)
+        # استخدام النموذج المجهز مسبقاً
+        reader = reader_ar_en if language == "ar" else reader_en
 
         for page_num in range(len(doc)):
             if pages_done >= 5:
                 break
 
-            # رفع الدقة إلى 3.0 لتحسين وضوح الحروف الصغيرة
-            mat = fitz.Matrix(3.0, 3.0)
+            # استخدام 2.0 بدلاً من 3.0 لتقليل استهلاك الذاكرة ومنع الـ Crash
+            mat = fitz.Matrix(2.0, 2.0)
             pix = doc[page_num].get_pixmap(matrix=mat)
             img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
             img_np = np.array(img)
 
             if language == "ar":
                 processed_img = preprocess_image_arabic(img_np)
-                # تعطل paragraph=True للعربي لتجنب ترتيب السطور والكلمات المعكوس
                 result = reader.readtext(processed_img, detail=1, paragraph=False)
-                # ترتيب النتائج من الأعلى إلى الأسفل ومن اليمين إلى اليسار
                 result.sort(key=lambda x: (x[0][0][1], -x[0][0][0]))
                 text = " ".join([r[1] for r in result])
-                # تنظيف النصوص مع الحفاظ على الحركات الأساسية والأرقام
                 text = re.sub(r'[^\w\s\u0600-\u06FF\u0750-\u077F0-9\.،؟]', ' ', text)
             else:
                 gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
@@ -98,14 +99,14 @@ def extract_from_image(file_bytes, language):
         img_np = np.array(img)
 
         if language == "ar":
-            reader = easyocr.Reader(['ar', 'en'], gpu=False)
+            reader = reader_ar_en
             processed_img = preprocess_image_arabic(img_np)
             result = reader.readtext(processed_img, detail=1, paragraph=False)
             result.sort(key=lambda x: (x[0][0][1], -x[0][0][0]))
             text = " ".join([r[1] for r in result])
             text = re.sub(r'[^\w\s\u0600-\u06FF\u0750-\u077F0-9\.،؟]', ' ', text)
         else:
-            reader = easyocr.Reader(['en'], gpu=False)
+            reader = reader_ar_en
             if len(img_np.shape) == 3:
                 gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
             else:
@@ -151,12 +152,6 @@ def extract_text():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# ============================================
-# فتح المتصفح تلقائياً
-# ============================================
-def open_browser():
-    webbrowser.open_new('http://127.0.0.1:5000/')
-
 if __name__ == '__main__':
-    Timer(1, open_browser).start()
-    app.run(debug=True, port=5000, use_reloader=False)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)

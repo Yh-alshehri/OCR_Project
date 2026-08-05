@@ -1,8 +1,11 @@
 flask
 flask-cors
 PyMuPDF
-easyocr
 Pillow
 numpy
 opencv-python-headless
 gunicorn
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+torchvision
+easyocr
