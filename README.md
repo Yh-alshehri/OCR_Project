@@ -8,6 +8,6 @@ A web-based OCR application built with **Flask** **EasyOCR** and **PyMuPDF** to 
 - Automatic browser launcher on startup.
 
 ## Technologies Used
-- **Backend:** Python Flask Flask-CORS
-- **OCR Engine:** EasyOCR OpenCV PyMuPDF (fitz)
-- **Frontend:** HTML JavaScript CSS
+- **Backend:** Python    Flask    Flask-CORS
+- **OCR Engine:** EasyOCR   OpenCV   PyMuPDF (fitz)
+- **Frontend:** HTML  JavaScript   CSS
