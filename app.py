@@ -3,123 +3,72 @@ from flask_cors import CORS
 import io
 import os
 import fitz
-from PIL import Image
-import easyocr
-import numpy as np
-import cv2
-import re
+import requests
 
 app = Flask(__name__)
 CORS(app)
 
-# ============================================
-# تحميل النماذج مرة واحدة فقط عند بدء التشغيل لتوفير الذاكرة
-# ============================================
-print("Loading EasyOCR models into memory...")
-reader_ar_en = easyocr.Reader(['ar', 'en'], gpu=False)
-reader_en = easyocr.Reader(['en'], gpu=False)
-print("Models loaded successfully!")
+# استخدام خدمة OCR مجانية وسريعة للصور والصفحات المصورة بدون استهلاك ذاكرة السيرفر
+OCR_SPACE_API_KEY = 'helloworld'  # المفتاح المجاني العام للاختبار
 
-# ============================================
-# تحسين الصورة المخصص للغة العربية
-# ============================================
-def preprocess_image_arabic(img_np):
+def ocr_space_file(file_bytes, filename, language='ara'):
+    """ استخراج النص من الصور أو الـ PDF عبر API مجاني خفيف """
     try:
-        if len(img_np.shape) == 3:
-            gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
-        else:
-            gray = img_np
-        
-        denoised = cv2.fastNlMeansDenoising(gray, h=10)
-        binary = cv2.adaptiveThreshold(
-            denoised, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-            cv2.THRESH_BINARY, 11, 2
+        lang_code = 'ara' if language == 'ar' else 'eng'
+        payload = {
+            'apikey': OCR_SPACE_API_KEY,
+            'language': lang_code,
+            'isOverlayRequired': False,
+            'OCREngine': 2, # Engine 2 ممتازة جداً للغة العربية
+        }
+        files = {
+            'file': (filename, file_bytes)
+        }
+        response = requests.post(
+            'https://api.ocr.space/parse/image',
+            files=files,
+            data=payload,
+            timeout=30
         )
-        return binary
-    except:
-        return img_np
+        result = response.json()
+        
+        if result.get("IsErroredOnProcessing"):
+            return f"❌ خطأ في المعالجة: {result.get('ErrorMessage')}"
+        
+        parsed_results = result.get("ParsedResults", [])
+        extracted_text = ""
+        for i, page in enumerate(parsed_results):
+            text = page.get("ParsedText", "").strip()
+            if text:
+                extracted_text += f"\n📄 Page/Section {i+1}:\n{text}\n" + "-"*40 + "\n"
+                
+        return extracted_text if extracted_text.strip() else "⚠️ لم يتم العثور على نص واضح."
+    except Exception as e:
+        return f"❌ OCR API Error: {str(e)}"
 
-# ============================================
-# استخراج النص من PDF
-# ============================================
-def extract_from_pdf(file_bytes, language):
+def extract_from_pdf(file_bytes, filename, language):
     try:
         doc = fitz.open(stream=file_bytes, filetype="pdf")
         all_text = ""
-        pages_done = 0
 
-        reader = reader_ar_en if language == "ar" else reader_en
+        # أولاً: المحاولة عبر استخراج النص الرقمي مباشرة (سريع جداً وخفيف)
+        for page_num in range(min(len(doc), 10)):
+            text = doc[page_num].get_text()
+            if text.strip():
+                all_text += f"\n📄 Page {page_num+1}:\n{text.strip()}\n" + "-"*40 + "\n"
 
-        for page_num in range(len(doc)):
-            if pages_done >= 5:
-                break
+        # ثانياً: إذا كان الملف عبارة عن صور مسحوبة ضوئياً (Scanned PDF)
+        if not all_text.strip():
+            print("PDF contains images, routing to OCR Engine...")
+            all_text = ocr_space_file(file_bytes, filename, language)
 
-            # دقة 1.5 كافية جدًا للقراءة وتحافظ على الذاكرة
-            mat = fitz.Matrix(1.5, 1.5)
-            pix = doc[page_num].get_pixmap(matrix=mat)
-            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-            img_np = np.array(img)
-
-            if language == "ar":
-                processed_img = preprocess_image_arabic(img_np)
-                result = reader.readtext(processed_img, detail=1, paragraph=False)
-                result.sort(key=lambda x: (x[0][0][1], -x[0][0][0]))
-                text = " ".join([r[1] for r in result])
-                text = re.sub(r'[^\w\s\u0600-\u06FF\u0750-\u077F0-9\.،؟]', ' ', text)
-            else:
-                gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
-                enhanced = cv2.equalizeHist(gray)
-                result = reader.readtext(enhanced, paragraph=True)
-                text = " ".join([r[1] for r in result])
-                text = re.sub(r'[^\w\s\.،]', ' ', text)
-
-            text = re.sub(r'\s+', ' ', text).strip()
-
-            if text and len(text) > 10:
-                pages_done += 1
-                all_text += f"\n📄 Page {page_num+1}:\n{text}\n"
-                all_text += "-" * 40 + "\n"
-
-        return all_text if all_text.strip() else "⚠️ لم يتم العثور على نص واضح"
-
+        return all_text
     except Exception as e:
         return f"❌ PDF Error: {str(e)}"
 
-# ============================================
-# استخراج النص من صورة
-# ============================================
-def extract_from_image(file_bytes, language):
-    try:
-        img = Image.open(io.BytesIO(file_bytes))
-        img_np = np.array(img)
+def extract_from_image(file_bytes, filename, language):
+    return ocr_space_file(file_bytes, filename, language)
 
-        if language == "ar":
-            reader = reader_ar_en
-            processed_img = preprocess_image_arabic(img_np)
-            result = reader.readtext(processed_img, detail=1, paragraph=False)
-            result.sort(key=lambda x: (x[0][0][1], -x[0][0][0]))
-            text = " ".join([r[1] for r in result])
-            text = re.sub(r'[^\w\s\u0600-\u06FF\u0750-\u077F0-9\.،؟]', ' ', text)
-        else:
-            reader = reader_en
-            if len(img_np.shape) == 3:
-                gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
-            else:
-                gray = img_np
-            enhanced = cv2.equalizeHist(gray)
-            result = reader.readtext(enhanced, paragraph=True)
-            text = " ".join([r[1] for r in result])
-            text = re.sub(r'[^\w\s\.،]', ' ', text)
-
-        text = re.sub(r'\s+', ' ', text).strip()
-        return text if text else "⚠️ لم يتم العثور على نص في الصورة"
-
-    except Exception as e:
-        return f"❌ Image Error: {str(e)}"
-
-# ============================================
-# Flask Routes
-# ============================================
 @app.route('/')
 def home():
     return render_template('index.html')
@@ -136,11 +85,12 @@ def extract_text():
 
         language = request.form.get('language', 'ar')
         file_bytes = file.read()
+        filename = file.filename
 
-        if file.filename.lower().endswith('.pdf'):
-            text = extract_from_pdf(file_bytes, language)
+        if filename.lower().endswith('.pdf'):
+            text = extract_from_pdf(file_bytes, filename, language)
         else:
-            text = extract_from_image(file_bytes, language)
+            text = extract_from_image(file_bytes, filename, language)
 
         return jsonify({'status': 'success', 'text': text})
 
