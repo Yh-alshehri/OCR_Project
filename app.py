@@ -8,18 +8,20 @@ import requests
 app = Flask(__name__)
 CORS(app)
 
-# استخدام خدمة OCR مجانية وسريعة للصور والصفحات المصورة بدون استهلاك ذاكرة السيرفر
-OCR_SPACE_API_KEY = 'helloworld'  # المفتاح المجاني العام للاختبار
+# مفتاح API مجاني لخدمة استخراج النصوص
+OCR_SPACE_API_KEY = 'helloworld'
 
-def ocr_space_file(file_bytes, filename, language='ara'):
-    """ استخراج النص من الصور أو الـ PDF عبر API مجاني خفيف """
+def ocr_space_file(file_bytes, filename, language='ar'):
+    """ استخراج النص من الصور والملفات المصورة """
     try:
-        lang_code = 'ara' if language == 'ar' else 'eng'
+        # ضبط رمز اللغة العربي المناسب لـ API
+        lang_code = 'arabic' if language == 'ar' else 'eng'
+        
         payload = {
             'apikey': OCR_SPACE_API_KEY,
             'language': lang_code,
             'isOverlayRequired': False,
-            'OCREngine': 2, # Engine 2 ممتازة جداً للغة العربية
+            'OCREngine': 2,  # المحرك المخصص والممتاز للغة العربية
         }
         files = {
             'file': (filename, file_bytes)
@@ -40,7 +42,7 @@ def ocr_space_file(file_bytes, filename, language='ara'):
         for i, page in enumerate(parsed_results):
             text = page.get("ParsedText", "").strip()
             if text:
-                extracted_text += f"\n📄 Page/Section {i+1}:\n{text}\n" + "-"*40 + "\n"
+                extracted_text += f"\n📄 صفحة / جزء {i+1}:\n{text}\n" + "-"*40 + "\n"
                 
         return extracted_text if extracted_text.strip() else "⚠️ لم يتم العثور على نص واضح."
     except Exception as e:
@@ -51,15 +53,14 @@ def extract_from_pdf(file_bytes, filename, language):
         doc = fitz.open(stream=file_bytes, filetype="pdf")
         all_text = ""
 
-        # أولاً: المحاولة عبر استخراج النص الرقمي مباشرة (سريع جداً وخفيف)
+        # 1. محاولة استخراج النص المباشر من الـ PDF (إذا كان نصياً وليس صورة)
         for page_num in range(min(len(doc), 10)):
             text = doc[page_num].get_text()
             if text.strip():
-                all_text += f"\n📄 Page {page_num+1}:\n{text.strip()}\n" + "-"*40 + "\n"
+                all_text += f"\n📄 صفحة {page_num+1}:\n{text.strip()}\n" + "-"*40 + "\n"
 
-        # ثانياً: إذا كان الملف عبارة عن صور مسحوبة ضوئياً (Scanned PDF)
+        # 2. إذا كان الـ PDF عبارة عن صور مصورة (Scanned PDF)، يتم توجيهه للـ OCR
         if not all_text.strip():
-            print("PDF contains images, routing to OCR Engine...")
             all_text = ocr_space_file(file_bytes, filename, language)
 
         return all_text
@@ -83,7 +84,13 @@ def extract_text():
         if file.filename == '':
             return jsonify({'error': 'File name is empty'}), 400
 
-        language = request.form.get('language', 'ar')
+        # قراءة خيار اللغة من الواجهة وضبطه سواء جاء "ar" أو "العربية"
+        lang_input = request.form.get('language', 'ar').lower()
+        if 'عرب' in lang_input or lang_input in ['ar', 'ara', 'arabic']:
+            language = 'ar'
+        else:
+            language = 'en'
+
         file_bytes = file.read()
         filename = file.filename
 
