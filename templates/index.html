@@ -1,79 +1,159 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html lang="ar">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>نظام استخراج النصوص - OCR</title>
+    <title>OCR - استخراج النصوص</title>
+
+    <!-- ===== مكتبات خارجية ===== -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+
     <style>
+        /* =========================
+           Global Styles
+        ========================= */
         * {
-            box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: system-ui, -apple-system, sans-serif;
+            box-sizing: border-box;
         }
+
         body {
+            font-family: "Cairo", sans-serif;
             background: linear-gradient(135deg, #0b0f19, #1a2234);
-            color: #fff;
+            color: #e5e7eb;
             min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
             padding: 20px;
         }
+
         .container {
             width: 100%;
-            max-width: 950px;
+            max-width: 1000px;
             background: #1a2234;
             padding: 30px;
             border-radius: 16px;
             border: 1px solid #28334e;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
         }
-        h1 {
+
+        /* =========================
+           Header
+        ========================= */
+        .header {
             text-align: center;
-            font-size: 28px;
-            margin-bottom: 8px;
+            padding: 20px 20px 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
             background: linear-gradient(90deg, #ffffff, #a5b4fc);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
         }
-        .subtitle {
-            text-align: center;
+
+        .header p {
             color: #9ca3af;
-            margin-bottom: 25px;
-            font-size: 14px;
+            font-size: 1.1rem;
         }
-        .upload-area {
+
+        /* =========================
+           Upload Box
+        ========================= */
+        .upload-box {
+            background: #131927;
             border: 2px dashed #374151;
             border-radius: 12px;
-            padding: 40px 20px;
+            padding: 30px;
             text-align: center;
             cursor: pointer;
             transition: 0.3s;
-            background: #131927;
         }
-        .upload-area:hover {
+
+        .upload-box:hover {
             border-color: #6366f1;
         }
-        .upload-area.dragover {
+
+        .upload-box.dragover {
             border-color: #6366f1;
             background: #1f2a3f;
         }
+
+        .upload-box i {
+            font-size: 48px;
+            color: #6366f1;
+            margin-bottom: 15px;
+        }
+
+        .upload-box h2 {
+            font-size: 1.5rem;
+            color: #e5e7eb;
+        }
+
+        .upload-box p {
+            color: #9ca3af;
+        }
+
+        .formats {
+            font-size: 0.9rem;
+            color: #6b7280;
+            margin: 10px 0;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
         .file-name {
             color: #a5b4fc;
             font-weight: bold;
             margin-top: 10px;
         }
+
+        /* =========================
+           Preview
+        ========================= */
+        #previewArea {
+            margin-top: 20px;
+            text-align: center;
+            min-height: 150px;
+            background: #0b0f19;
+            border-radius: 12px;
+            border: 1px solid #28334e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #6b7280;
+            padding: 10px;
+        }
+
+        #previewArea img,
+        #previewArea canvas {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 8px;
+        }
+
+        /* =========================
+           Language + Extract Button
+        ========================= */
         .row {
             display: flex;
             flex-wrap: wrap;
             gap: 15px;
             margin-top: 20px;
         }
+
         .col {
             flex: 1;
-            min-width: 180px;
+            min-width: 150px;
         }
+
         label {
             display: block;
             margin-bottom: 6px;
@@ -81,7 +161,9 @@
             color: #d1d5db;
             font-size: 14px;
         }
-        select, button {
+
+        select,
+        button {
             width: 100%;
             padding: 12px;
             border-radius: 8px;
@@ -89,24 +171,32 @@
             font-size: 16px;
             cursor: pointer;
         }
+
         select {
             background: #242e42;
             color: #fff;
         }
+
         button {
             background: #6366f1;
             color: #fff;
             font-weight: bold;
             transition: 0.3s;
         }
+
         button:hover {
             background: #4f46e5;
         }
+
         button:disabled {
             opacity: 0.5;
             cursor: not-allowed;
         }
-        .output {
+
+        /* =========================
+           Output
+        ========================= */
+        .output-area {
             margin-top: 20px;
             background: #0b0f19;
             border-radius: 12px;
@@ -120,15 +210,112 @@
             line-height: 1.6;
             color: #e5e7eb;
         }
-        .output:empty::before {
-            content: "النص المستخرج سيظهر هنا...";
+
+        .output-area:empty::before {
+            content: "📝 النص المستخرج سيظهر هنا...";
             color: #6b7280;
         }
+
         .status {
             margin-top: 10px;
             font-size: 14px;
             color: #9ca3af;
         }
+
+        /* =========================
+           Copy & Download Buttons
+        ========================= */
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        .action-buttons button {
+            flex: 1;
+            min-width: 120px;
+            padding: 12px;
+            border-radius: 8px;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .btn-copy {
+            background: #22c55e;
+            color: #fff;
+        }
+
+        .btn-copy:hover {
+            background: #16a34a;
+        }
+
+        .btn-download {
+            background: #3b82f6;
+            color: #fff;
+        }
+
+        .btn-download:hover {
+            background: #2563eb;
+        }
+
+        .btn-copy:disabled,
+        .btn-download:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* =========================
+           Accuracy Note
+        ========================= */
+        .accuracy-note {
+            margin-top: 25px;
+            padding: 16px 20px;
+            background: #0f172a;
+            border-radius: 12px;
+            border: 1px solid #28334e;
+        }
+
+        .accuracy-note h3 {
+            margin-bottom: 10px;
+            font-size: 16px;
+            color: #e5e7eb;
+        }
+
+        .accuracy-note table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .accuracy-note th {
+            text-align: left;
+            color: #9ca3af;
+            font-weight: 600;
+            padding-bottom: 6px;
+            border-bottom: 1px solid #28334e;
+        }
+
+        .accuracy-note td {
+            padding: 6px 0;
+            color: #d1d5db;
+        }
+
+        .accuracy-note .note-small {
+            margin-top: 10px;
+            font-size: 13px;
+            color: #9ca3af;
+        }
+
+        .footer {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #6b7280;
+        }
+
         .loading {
             display: inline-block;
             width: 18px;
@@ -138,135 +325,180 @@
             border-radius: 50%;
             animation: spin 0.7s linear infinite;
             vertical-align: middle;
-            margin-left: 8px;
+            margin-right: 8px;
         }
+
         @keyframes spin {
-            to { transform: rotate(360deg); }
+            to {
+                transform: rotate(360deg);
+            }
         }
-        .btn-download {
-            background: #22c55e;
-            margin-top: 10px;
-        }
-        .btn-download:hover {
-            background: #16a34a;
-        }
-        .flex {
-            display: flex;
-            gap: 10px;
-        }
-        .accuracy-note {
-            margin-top: 25px;
-            padding: 16px 20px;
-            background: #0f172a;
-            border-radius: 12px;
-            border: 1px solid #28334e;
-        }
-        .accuracy-note h3 {
-            margin-bottom: 10px;
-            font-size: 16px;
-            color: #e5e7eb;
-        }
-        .accuracy-note table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 14px;
-        }
-        .accuracy-note th {
-            text-align: right;
-            color: #9ca3af;
-            font-weight: 600;
-            padding-bottom: 6px;
-            border-bottom: 1px solid #28334e;
-        }
-        .accuracy-note td {
-            padding: 6px 0;
-            color: #d1d5db;
-        }
-        .accuracy-note .note-small {
-            margin-top: 10px;
-            font-size: 13px;
-            color: #9ca3af;
-        }
-        .footer {
-            margin-top: 20px;
-            text-align: center;
-            font-size: 12px;
-            color: #6b7280;
+
+        /* =========================
+           Responsive
+        ========================= */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .action-buttons {
+                flex-direction: column;
+            }
+
+            .action-buttons button {
+                width: 100%;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>استخراج النصوص ضوئياً (OCR)</h1>
-        <p class="subtitle">قم برفع مستند PDF أو صورة لاختبار المعالجة واستخراج النصوص</p>
 
-        <div class="upload-area" id="dropZone">
-            <p>اسحب الملف إلى هنا أو انقر للاختيار من الجهاز</p>
-            <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg" style="display:none;">
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1> OCR استخراج النصوص</h1>
+            <p>ارفع صورة أو ملف PDF واختر اللغة</p>
+        </div>
+
+        <!-- Upload -->
+        <div class="upload-box" id="dropZone">
+            <i class="fas fa-cloud-upload-alt"></i>
+            <h2>ارفع ملفك</h2>
+            <p>اسحب الملف هنا أو اضغط للرفع</p>
+            <div class="formats">PDF • JPG • JPEG • PNG</div>
+            <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg">
             <div class="file-name" id="fileName"></div>
         </div>
 
+        <!-- Preview -->
+        <div id="previewArea"> ستظهر معاينة الملف هنا</div>
+
+        <!-- Language + Extract -->
         <div class="row">
             <div class="col">
-                <label for="langSelect">لغة المستند</label>
+                <label for="langSelect">🌐 اللغة</label>
                 <select id="langSelect">
                     <option value="ar">العربية</option>
-                    <option value="en">الإنجليزية</option>
+                    <option value="en">English</option>
                 </select>
             </div>
             <div class="col">
                 <label>&nbsp;</label>
-                <button id="extractBtn">بدء المعالجة واستخراج النص</button>
+                <button id="extractBtn">🚀 استخراج النص</button>
             </div>
         </div>
 
-        <div class="output" id="output"></div>
+        <!-- Output -->
+        <div class="output-area" id="output"></div>
         <div class="status" id="status"></div>
 
-        <div class="flex" style="margin-top: 10px;">
-            <button class="btn-download" id="downloadBtn" style="display:none;">تصدير النص (.txt)</button>
+        <!-- Copy & Download -->
+        <div class="action-buttons">
+            <button class="btn-copy" id="copyBtn" disabled> نسخ النص</button>
+            <button class="btn-download" id="downloadBtn" disabled> تحميل النص</button>
         </div>
 
+        <!-- Accuracy Note -->
         <div class="accuracy-note">
-            <h3>مؤشرات دقة المعالجة</h3>
+            <h3> دقة استخراج النصوص</h3>
             <table>
                 <tr>
-                    <th>اللغة Target</th>
-                    <th>نسبة الدقة التقديرية</th>
-                    <th>ملاحظات الأداء</th>
+                    <th>اللغة</th>
+                    <th>الدقة المتوقعة</th>
+                    <th>ملاحظات</th>
                 </tr>
                 <tr>
-                    <td>العربية</td>
-                    <td>85% – 95%</td>
-                    <td>تتأثر بدقة المسح الضوئي ووضوح محاذاة الخطوط</td>
+                    <td> العربية</td>
+                    <td>~85–95%</td>
+                    <td>تعتمد على جودة الصورة ووضوح الخط</td>
                 </tr>
                 <tr>
-                    <td>الإنجليزية</td>
-                    <td>90% – 98%</td>
-                    <td>أعلى كفاءة مع المحارف القياسية والخطوط المطبوعة</td>
+                    <td> English</td>
+                    <td>~90–98%</td>
+                    <td>أدق مع النصوص الواضحة والخطوط المنتظمة</td>
                 </tr>
             </table>
-            <p class="note-small">ملاحظة: تختلف جودة المخرجات حسب درجة تباين الصورة ودقتها</p>
+            <p class="note-small"> قد تقل الدقة مع الصور منخفضة الجودة أو الخطوط غير الواضحة</p>
         </div>
 
         <div class="footer">
-            معالجة سريعة | معالجة حتى 5 صفحات لكل طلب
+             يستخرج أول 5 صفحات |  دقة عالية
         </div>
     </div>
 
     <script>
-        const dropZone = document.getElementById('dropZone');
+        // ================================
+        // Select Elements
+        // ================================
         const fileInput = document.getElementById('fileInput');
+        const dropZone = document.getElementById('dropZone');
         const fileName = document.getElementById('fileName');
+        const previewArea = document.getElementById('previewArea');
         const extractBtn = document.getElementById('extractBtn');
         const output = document.getElementById('output');
         const status = document.getElementById('status');
         const langSelect = document.getElementById('langSelect');
+        const copyBtn = document.getElementById('copyBtn');
         const downloadBtn = document.getElementById('downloadBtn');
 
         let selectedFile = null;
+        let extractedText = '';
 
-        dropZone.addEventListener('click', () => fileInput.click());
+        // ================================
+        // Preview File
+        // ================================
+        function previewFile(file) {
+            previewArea.innerHTML = '';
+            if (!file) {
+                previewArea.textContent = ' ستظهر معاينة الملف هنا';
+                return;
+            }
+
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    previewArea.innerHTML = `<img src="${e.target.result}" alt="Preview">`;
+                };
+                reader.readAsDataURL(file);
+            } else if (file.type === 'application/pdf') {
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    try {
+                        const typedArray = new Uint8Array(e.target.result);
+                        const pdf = await pdfjsLib.getDocument(typedArray).promise;
+                        const page = await pdf.getPage(1);
+                        const viewport = page.getViewport({ scale: 1.5 });
+                        const canvas = document.createElement('canvas');
+                        const context = canvas.getContext('2d');
+                        canvas.height = viewport.height;
+                        canvas.width = viewport.width;
+                        await page.render({ canvasContext: context, viewport: viewport }).promise;
+                        previewArea.innerHTML = '';
+                        previewArea.appendChild(canvas);
+                    } catch (err) {
+                        previewArea.textContent = ' لا يمكن معاينة هذا PDF';
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            }
+        }
+
+        // ================================
+        // File Input Events
+        // ================================
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length) {
+                selectedFile = fileInput.files[0];
+                fileName.textContent = '📎 ' + selectedFile.name;
+                previewFile(selectedFile);
+                output.textContent = '';
+                status.textContent = '';
+                extractedText = '';
+                copyBtn.disabled = true;
+                downloadBtn.disabled = true;
+            }
+        });
 
         dropZone.addEventListener('dragover', (e) => {
             e.preventDefault();
@@ -282,25 +514,18 @@
             dropZone.classList.remove('dragover');
             if (e.dataTransfer.files.length) {
                 fileInput.files = e.dataTransfer.files;
-                handleFileSelect(e.dataTransfer.files[0]);
+                fileInput.dispatchEvent(new Event('change'));
             }
         });
 
-        fileInput.addEventListener('change', () => {
-            if (fileInput.files.length) handleFileSelect(fileInput.files[0]);
-        });
+        dropZone.addEventListener('click', () => fileInput.click());
 
-        function handleFileSelect(file) {
-            selectedFile = file;
-            fileName.textContent = 'الملف المحدد: ' + file.name;
-            output.textContent = '';
-            status.textContent = '';
-            downloadBtn.style.display = 'none';
-        }
-
+        // ================================
+        // Extract Text
+        // ================================
         extractBtn.addEventListener('click', async () => {
             if (!selectedFile) {
-                status.textContent = 'يرجى اختيار ملف قبل بدء المعالجة.';
+                status.textContent = ' الرجاء اختيار ملف أولاً';
                 return;
             }
 
@@ -309,38 +534,66 @@
             formData.append('language', langSelect.value);
 
             output.textContent = '';
-            status.innerHTML = '<span class="loading"></span> جاري معالجة الملف واستخراج النص...';
+            status.innerHTML = '<span class="loading"></span> جاري الاستخراج...';
             extractBtn.disabled = true;
-            downloadBtn.style.display = 'none';
+            copyBtn.disabled = true;
+            downloadBtn.disabled = true;
 
             try {
                 const res = await fetch('/extract', { method: 'POST', body: formData });
                 const data = await res.json();
 
                 if (data.error) {
-                    output.textContent = 'خطأ: ' + data.error;
-                    status.textContent = 'فشلت عملية المعالجة.';
+                    output.textContent = '❌ ' + data.error;
+                    status.textContent = '❌ حدث خطأ';
                 } else {
-                    output.textContent = data.text || 'لم يتم العثور على محتوى نصي قابل للاستخراج.';
-                    status.textContent = 'اكتملت المعالجة بنجاح.';
-                    if (data.text && data.text.length > 10) {
-                        downloadBtn.style.display = 'inline-block';
-                        downloadBtn.onclick = () => {
-                            const blob = new Blob([data.text], { type: 'text/plain;charset=utf-8' });
-                            const a = document.createElement('a');
-                            a.href = URL.createObjectURL(blob);
-                            a.download = 'extracted_text.txt';
-                            a.click();
-                        };
+                    extractedText = data.text || ' لم يتم استخراج نص';
+                    output.textContent = extractedText;
+                    status.textContent = ' تم الاستخراج بنجاح';
+                    if (extractedText && extractedText.length > 10) {
+                        copyBtn.disabled = false;
+                        downloadBtn.disabled = false;
                     }
                 }
             } catch (err) {
-                output.textContent = 'تعذر الاتصال بالخادم.';
-                status.textContent = 'خطأ في الاتصال: ' + err.message;
+                output.textContent = ' خطأ في الاتصال بالسيرفر';
+                status.textContent = '❌ ' + err.message;
             }
 
             extractBtn.disabled = false;
         });
+
+        // ================================
+        // Copy Text
+        // ================================
+        copyBtn.addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(extractedText);
+                status.textContent = ' تم نسخ النص';
+            } catch {
+                const textarea = document.createElement('textarea');
+                textarea.value = extractedText;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                status.textContent = ' تم نسخ النص';
+            }
+        });
+
+        // ================================
+        // Download Text
+        // ================================
+        downloadBtn.addEventListener('click', () => {
+            const blob = new Blob([extractedText], { type: 'text/plain' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'extracted_text.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        });
     </script>
+
 </body>
 </html>
