@@ -4,7 +4,6 @@ import io
 import os
 import fitz
 import requests
-from PIL import Image
 
 app = Flask(__name__)
 CORS(app)
@@ -12,10 +11,8 @@ CORS(app)
 OCR_SPACE_API_KEY = 'helloworld'
 
 def ocr_space_bytes(image_bytes, language='ar'):
-    """ إرسال مصفوفة الصورة المباشرة للـ API """
     try:
         lang_code = 'arabic' if language == 'ar' else 'eng'
-        
         payload = {
             'apikey': OCR_SPACE_API_KEY,
             'language': lang_code,
@@ -29,18 +26,16 @@ def ocr_space_bytes(image_bytes, language='ar'):
             'https://api.ocr.space/parse/image',
             files=files,
             data=payload,
-            timeout=30
+            timeout=45
         )
         result = response.json()
-        
         if result.get("IsErroredOnProcessing"):
             return ""
-        
         parsed_results = result.get("ParsedResults", [])
         if parsed_results:
             return parsed_results[0].get("ParsedText", "").strip()
         return ""
-    except Exception as e:
+    except Exception:
         return ""
 
 def extract_from_pdf(file_bytes, language):
@@ -48,24 +43,33 @@ def extract_from_pdf(file_bytes, language):
         doc = fitz.open(stream=file_bytes, filetype="pdf")
         all_text = ""
 
-        # 1. المحاولة الأولى: قراءة النص الرقمي المباشر
-        for page_num in range(min(len(doc), 5)):
+        # 1. القراءة المباشرة للسطور والنصوص الرقمية المخزنة
+        for page_num in range(min(len(doc), 15)):
             text = doc[page_num].get_text()
             if text.strip():
                 all_text += f"\n📄 صفحة {page_num+1}:\n{text.strip()}\n" + "-"*40 + "\n"
 
-        # 2. إذا كان الملف Scanned (صور)، نحول كل صفحة لصورة ونستخرج نصها عبر الـ OCR
+        # 2. إذا كانت الصفحات مصورة ضوئياً، نستخرج الصور المدمجة ونقرؤها
         if not all_text.strip():
-            for page_num in range(min(len(doc), 3)): # معالجة أول 3 صفحات لتفادي البطء
+            for page_num in range(min(len(doc), 3)):
                 page = doc[page_num]
-                pix = page.get_pixmap(dpi=150)
-                img_bytes = pix.tobytes("jpeg")
+                image_list = page.get_images(full=True)
                 
-                ocr_text = ocr_space_bytes(img_bytes, language)
-                if ocr_text:
-                    all_text += f"\n📄 صفحة {page_num+1}:\n{ocr_text}\n" + "-"*40 + "\n"
+                if image_list:
+                    xref = image_list[0][0]
+                    base_image = doc.extract_image(xref)
+                    img_bytes = base_image["image"]
+                    ocr_text = ocr_space_bytes(img_bytes, language)
+                    if ocr_text:
+                        all_text += f"\n📄 صفحة {page_num+1}:\n{ocr_text}\n" + "-"*40 + "\n"
+                else:
+                    pix = page.get_pixmap(dpi=100)
+                    img_bytes = pix.tobytes("jpeg")
+                    ocr_text = ocr_space_bytes(img_bytes, language)
+                    if ocr_text:
+                        all_text += f"\n📄 صفحة {page_num+1}:\n{ocr_text}\n" + "-"*40 + "\n"
 
-        return all_text if all_text.strip() else "⚠️ لم يتم العثور على نص واضح في الملف."
+        return all_text if all_text.strip() else "⚠️ لم يتم العثور على نص واضح في الملف. جربي رفع صورة مكبرة أو صفحة منفصلة."
     except Exception as e:
         return f"❌ PDF Error: {str(e)}"
 
