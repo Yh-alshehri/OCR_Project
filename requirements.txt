@@ -1,5 +1,8 @@
 flask
 flask-cors
 PyMuPDF
-requests
+easyocr
+Pillow
+numpy
+opencv-python-headless
 gunicorn

@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OCR - استخراج النصوص</title>
+    <title>نظام استخراج النصوص - OCR</title>
     <style>
         * {
             box-sizing: border-box;
@@ -58,9 +58,6 @@
         .upload-area.dragover {
             border-color: #6366f1;
             background: #1f2a3f;
-        }
-        .upload-icon {
-            font-size: 40px;
         }
         .file-name {
             color: #a5b4fc;
@@ -124,7 +121,7 @@
             color: #e5e7eb;
         }
         .output:empty::before {
-            content: "📝 النص المستخرج سيظهر هنا...";
+            content: "النص المستخرج سيظهر هنا...";
             color: #6b7280;
         }
         .status {
@@ -141,7 +138,7 @@
             border-radius: 50%;
             animation: spin 0.7s linear infinite;
             vertical-align: middle;
-            margin-right: 8px;
+            margin-left: 8px;
         }
         @keyframes spin {
             to { transform: rotate(360deg); }
@@ -157,8 +154,6 @@
             display: flex;
             gap: 10px;
         }
-
-        /* ===== ملاحظات الدقة ===== */
         .accuracy-note {
             margin-top: 25px;
             padding: 16px 20px;
@@ -177,7 +172,7 @@
             font-size: 14px;
         }
         .accuracy-note th {
-            text-align: left;
+            text-align: right;
             color: #9ca3af;
             font-weight: 600;
             padding-bottom: 6px;
@@ -192,7 +187,6 @@
             font-size: 13px;
             color: #9ca3af;
         }
-
         .footer {
             margin-top: 20px;
             text-align: center;
@@ -203,66 +197,60 @@
 </head>
 <body>
     <div class="container">
-        <h1>📖 OCR استخراج النصوص</h1>
-        <p class="subtitle">ارفع صورة أو ملف PDF واختر اللغة</p>
+        <h1>استخراج النصوص ضوئياً (OCR)</h1>
+        <p class="subtitle">قم برفع مستند PDF أو صورة لاختبار المعالجة واستخراج النصوص</p>
 
-        <!-- رفع الملف -->
         <div class="upload-area" id="dropZone">
-            <div class="upload-icon">📤</div>
-            <p>اسحب الملف هنا أو اضغط للرفع</p>
+            <p>اسحب الملف إلى هنا أو انقر للاختيار من الجهاز</p>
             <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg" style="display:none;">
             <div class="file-name" id="fileName"></div>
         </div>
 
-        <!-- اختيار اللغة واستخراج -->
         <div class="row">
             <div class="col">
-                <label for="langSelect">🌐 اللغة</label>
+                <label for="langSelect">لغة المستند</label>
                 <select id="langSelect">
                     <option value="ar">العربية</option>
-                    <option value="en">English</option>
+                    <option value="en">الإنجليزية</option>
                 </select>
             </div>
             <div class="col">
                 <label>&nbsp;</label>
-                <button id="extractBtn">🚀 استخراج النص</button>
+                <button id="extractBtn">بدء المعالجة واستخراج النص</button>
             </div>
         </div>
 
-        <!-- النتيجة -->
         <div class="output" id="output"></div>
         <div class="status" id="status"></div>
 
-        <!-- تحميل -->
         <div class="flex" style="margin-top: 10px;">
-            <button class="btn-download" id="downloadBtn" style="display:none;">📥 تحميل النص</button>
+            <button class="btn-download" id="downloadBtn" style="display:none;">تصدير النص (.txt)</button>
         </div>
 
-        <!-- ===== ملاحظات الدقة ===== -->
         <div class="accuracy-note">
-            <h3> دقة استخراج النصوص</h3>
+            <h3>مؤشرات دقة المعالجة</h3>
             <table>
                 <tr>
-                    <th>اللغة</th>
-                    <th>الدقة المتوقعة</th>
-                    <th>ملاحظات</th>
+                    <th>اللغة Target</th>
+                    <th>نسبة الدقة التقديرية</th>
+                    <th>ملاحظات الأداء</th>
                 </tr>
                 <tr>
-                    <td> العربية</td>
-                    <td>~85–95%</td>
-                    <td>تعتمد على جودة الصورة ووضوح الخط</td>
+                    <td>العربية</td>
+                    <td>85% – 95%</td>
+                    <td>تتأثر بدقة المسح الضوئي ووضوح محاذاة الخطوط</td>
                 </tr>
                 <tr>
-                    <td> English</td>
-                    <td>~90–98%</td>
-                    <td>أدق مع النصوص الواضحة والخطوط المنتظمة</td>
+                    <td>الإنجليزية</td>
+                    <td>90% – 98%</td>
+                    <td>أعلى كفاءة مع المحارف القياسية والخطوط المطبوعة</td>
                 </tr>
             </table>
-            <p class="note-small"> قد تقل الدقة مع الصور منخفضة الجودة أو الخطوط غير الواضحة</p>
+            <p class="note-small">ملاحظة: تختلف جودة المخرجات حسب درجة تباين الصورة ودقتها</p>
         </div>
 
         <div class="footer">
-        يستخرج أول 5 صفحات | دقة عالية
+            معالجة سريعة | معالجة حتى 5 صفحات لكل طلب
         </div>
     </div>
 
@@ -278,17 +266,17 @@
 
         let selectedFile = null;
 
-        // الضغط للرفع
         dropZone.addEventListener('click', () => fileInput.click());
 
-        // السحب والإفلات
         dropZone.addEventListener('dragover', (e) => {
             e.preventDefault();
             dropZone.classList.add('dragover');
         });
+
         dropZone.addEventListener('dragleave', () => {
             dropZone.classList.remove('dragover');
         });
+
         dropZone.addEventListener('drop', (e) => {
             e.preventDefault();
             dropZone.classList.remove('dragover');
@@ -298,23 +286,21 @@
             }
         });
 
-        // اختيار ملف
         fileInput.addEventListener('change', () => {
             if (fileInput.files.length) handleFileSelect(fileInput.files[0]);
         });
 
         function handleFileSelect(file) {
             selectedFile = file;
-            fileName.textContent = '📎 ' + file.name;
+            fileName.textContent = 'الملف المحدد: ' + file.name;
             output.textContent = '';
             status.textContent = '';
             downloadBtn.style.display = 'none';
         }
 
-        // استخراج النص
         extractBtn.addEventListener('click', async () => {
             if (!selectedFile) {
-                status.textContent = '⚠️ الرجاء اختيار ملف أولاً';
+                status.textContent = 'يرجى اختيار ملف قبل بدء المعالجة.';
                 return;
             }
 
@@ -323,7 +309,7 @@
             formData.append('language', langSelect.value);
 
             output.textContent = '';
-            status.innerHTML = '<span class="loading"></span> جاري الاستخراج...';
+            status.innerHTML = '<span class="loading"></span> جاري معالجة الملف واستخراج النص...';
             extractBtn.disabled = true;
             downloadBtn.style.display = 'none';
 
@@ -332,15 +318,15 @@
                 const data = await res.json();
 
                 if (data.error) {
-                    output.textContent = '❌ ' + data.error;
-                    status.textContent = '❌ حدث خطأ';
+                    output.textContent = 'خطأ: ' + data.error;
+                    status.textContent = 'فشلت عملية المعالجة.';
                 } else {
-                    output.textContent = data.text || '⚠️ لم يتم استخراج نص';
-                    status.textContent = '✅ تم الاستخراج بنجاح';
+                    output.textContent = data.text || 'لم يتم العثور على محتوى نصي قابل للاستخراج.';
+                    status.textContent = 'اكتملت المعالجة بنجاح.';
                     if (data.text && data.text.length > 10) {
                         downloadBtn.style.display = 'inline-block';
                         downloadBtn.onclick = () => {
-                            const blob = new Blob([data.text], { type: 'text/plain' });
+                            const blob = new Blob([data.text], { type: 'text/plain;charset=utf-8' });
                             const a = document.createElement('a');
                             a.href = URL.createObjectURL(blob);
                             a.download = 'extracted_text.txt';
@@ -349,8 +335,8 @@
                     }
                 }
             } catch (err) {
-                output.textContent = '❌ خطأ في الاتصال بالسيرفر';
-                status.textContent = '❌ ' + err.message;
+                output.textContent = 'تعذر الاتصال بالخادم.';
+                status.textContent = 'خطأ في الاتصال: ' + err.message;
             }
 
             extractBtn.disabled = false;

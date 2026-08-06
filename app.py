@@ -1,71 +1,109 @@
 from flask import Flask, render_template, request, jsonify
 from flask_cors import CORS
+import webbrowser
+from threading import Timer
 import io
 import os
 import fitz
-import requests
+from PIL import Image
+import easyocr
+import numpy as np
+import cv2
+import re
 
 app = Flask(__name__)
 CORS(app)
 
-OCR_SPACE_API_KEY = 'helloworld'
-
-def ocr_space_bytes(image_bytes, language='ar'):
+def preprocess_image_arabic(img_np):
     try:
-        lang_code = 'arabic' if language == 'ar' else 'eng'
-        payload = {
-            'apikey': OCR_SPACE_API_KEY,
-            'language': lang_code,
-            'isOverlayRequired': False,
-            'OCREngine': 2,
-        }
-        files = {
-            'file': ('image.jpg', image_bytes, 'image/jpeg')
-        }
-        response = requests.post(
-            'https://api.ocr.space/parse/image',
-            files=files,
-            data=payload,
-            timeout=30
+        if len(img_np.shape) == 3:
+            gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
+        else:
+            gray = img_np
+        
+        denoised = cv2.fastNlMeansDenoising(gray, h=10)
+        
+        binary = cv2.adaptiveThreshold(
+            denoised, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+            cv2.THRESH_BINARY, 11, 2
         )
-        result = response.json()
-        if result.get("IsErroredOnProcessing"):
-            return ""
-        parsed_results = result.get("ParsedResults", [])
-        if parsed_results:
-            return parsed_results[0].get("ParsedText", "").strip()
-        return ""
-    except Exception:
-        return ""
+        return binary
+    except:
+        return img_np
 
 def extract_from_pdf(file_bytes, language):
     try:
         doc = fitz.open(stream=file_bytes, filetype="pdf")
         all_text = ""
+        pages_done = 0
 
-        # 1. استخراج النص الرقمي المباشر
-        for page_num in range(min(len(doc), 10)):
-            text = doc[page_num].get_text()
-            if text.strip():
-                all_text += f"\n📄 صفحة {page_num+1}:\n{text.strip()}\n" + "-"*40 + "\n"
+        if language == "ar":
+            reader = easyocr.Reader(['ar', 'en'], gpu=False)
+        else:
+            reader = easyocr.Reader(['en'], gpu=False)
 
-        # 2. إذا كان الملف مصور (Scanned PDF)
-        if not all_text.strip():
-            for page_num in range(min(len(doc), 3)):
-                page = doc[page_num]
-                pix = page.get_pixmap(dpi=150)
-                img_bytes = pix.tobytes("jpeg")
-                ocr_result = ocr_space_bytes(img_bytes, language)
-                if ocr_result:
-                    all_text += f"\n📄 صفحة {page_num+1}:\n{ocr_result}\n" + "-"*40 + "\n"
+        for page_num in range(len(doc)):
+            if pages_done >= 5:
+                break
 
-        return all_text if all_text.strip() else "⚠️ لم يتم العثور على نص واضح في الملف."
+            mat = fitz.Matrix(3.0, 3.0)
+            pix = doc[page_num].get_pixmap(matrix=mat)
+            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            img_np = np.array(img)
+
+            if language == "ar":
+                processed_img = preprocess_image_arabic(img_np)
+                result = reader.readtext(processed_img, detail=1, paragraph=False)
+                result.sort(key=lambda x: (x[0][0][1], -x[0][0][0]))
+                text = " ".join([r[1] for r in result])
+                text = re.sub(r'[^\w\s\u0600-\u06FF\u0750-\u077F0-9\.،؟]', ' ', text)
+            else:
+                gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
+                enhanced = cv2.equalizeHist(gray)
+                result = reader.readtext(enhanced, paragraph=True)
+                text = " ".join([r[1] for r in result])
+                text = re.sub(r'[^\w\s\.،]', ' ', text)
+
+            text = re.sub(r'\s+', ' ', text).strip()
+
+            if text and len(text) > 10:
+                pages_done += 1
+                all_text += f"\n📄 Page {page_num+1}:\n{text}\n"
+                all_text += "-" * 40 + "\n"
+
+        return all_text if all_text.strip() else "⚠️ لم يتم العثور على نص واضح"
+
     except Exception as e:
         return f"❌ PDF Error: {str(e)}"
 
 def extract_from_image(file_bytes, language):
-    ocr_result = ocr_space_bytes(file_bytes, language)
-    return ocr_result if ocr_result else "⚠️ لم يتم العثور على نص واضح في الصورة."
+    try:
+        img = Image.open(io.BytesIO(file_bytes))
+        img_np = np.array(img)
+
+        if language == "ar":
+            reader = easyocr.Reader(['ar', 'en'], gpu=False)
+            processed_img = preprocess_image_arabic(img_np)
+            result = reader.readtext(processed_img, detail=1, paragraph=False)
+            result.sort(key=lambda x: (x[0][0][1], -x[0][0][0]))
+            text = " ".join([r[1] for r in result])
+            text = re.sub(r'[^\w\s\u0600-\u06FF\u0750-\u077F0-9\.،؟]', ' ', text)
+        else:
+            reader = easyocr.Reader(['en'], gpu=False)
+            if len(img_np.shape) == 3:
+                gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
+            else:
+                gray = img_np
+            enhanced = cv2.equalizeHist(gray)
+            result = reader.readtext(enhanced, paragraph=True)
+            text = " ".join([r[1] for r in result])
+            text = re.sub(r'[^\w\s\.،]', ' ', text)
+
+        text = re.sub(r'\s+', ' ', text).strip()
+        return text if text else "⚠️ لم يتم العثور على نص في الصورة"
+
+    except Exception as e:
+        return f"❌ Image Error: {str(e)}"
 
 @app.route('/')
 def home():
@@ -81,13 +119,10 @@ def extract_text():
         if file.filename == '':
             return jsonify({'error': 'File name is empty'}), 400
 
-        raw_lang = str(request.form.get('language', 'ar')).strip().lower()
-        language = 'ar' if ('ar' in raw_lang or 'عرب' in raw_lang) else 'en'
-
+        language = request.form.get('language', 'ar')
         file_bytes = file.read()
-        filename = file.filename
 
-        if filename.lower().endswith('.pdf'):
+        if file.filename.lower().endswith('.pdf'):
             text = extract_from_pdf(file_bytes, language)
         else:
             text = extract_from_image(file_bytes, language)
@@ -97,6 +132,9 @@ def extract_text():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+def open_browser():
+    webbrowser.open_new('http://127.0.0.1:5000/')
+
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    Timer(1, open_browser).start()
+    app.run(debug=True, port=5000, use_reloader=False)
